@@ -152,6 +152,9 @@
 		<!-- Head Libs -->
 		<script src="assets/vendor/modernizr/modernizr.js"></script>
 
+        <!-- SweetAlert2 -->
+        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
         <!-- bootstrap datepicker -->
         <link rel="stylesheet" href="assets/bower_components/bootstrap-datepicker/dist/css/bootstrap-datepicker.min.css">
 
@@ -160,50 +163,56 @@
         
         <script>
             function not1(){
-                notif({
-                    msg: "Se guardo correctamente",
-                    type: "success",
-                    position: "center"
+                Swal.fire({
+                    title: '¡Éxito!',
+                    text: 'Se guardó correctamente',
+                    icon: 'success',
+                    timer: 2000,
+                    showConfirmButton: false
                 });
             }
         </script>
 
         <script>
             function not2(){
-                notif({
-                    msg: "Algunos campos estan vacios",
-                    type: "error",
-                    position: "center"
+                Swal.fire({
+                    title: '¡Atención!',
+                    text: 'Algunos campos están vacíos',
+                    icon: 'warning'
                 });
             }
         </script>
 
         <script>
             function not3(){
-                notif({
-                    msg: "Los datos se actualizarón correctamente",
-                    type: "success",
-                    position: "center"
+                Swal.fire({
+                    title: '¡Éxito!',
+                    text: 'Los datos se actualizaron correctamente',
+                    icon: 'success',
+                    timer: 2000,
+                    showConfirmButton: false
                 });
             }
         </script>
 
         <script>
             function not4(){
-                notif({
-                    msg: "Se elimino correctamente",
-                    type: "success",
-                    position: "center"
+                Swal.fire({
+                    title: '¡Eliminado!',
+                    text: 'Se eliminó correctamente',
+                    icon: 'success',
+                    timer: 2000,
+                    showConfirmButton: false
                 });
             }
         </script>
         
         <script>
             function not5(){
-                notif({
-                    msg: "Error! algo salio mal",
-                    type: "error",
-                    position: "center"
+                Swal.fire({
+                    title: '¡Error!',
+                    text: 'Algo salió mal',
+                    icon: 'error'
                 });
             }
         </script>
