@@ -1,8 +1,5 @@
 <?php
 	session_start();
-    $nombre     = $_SESSION['nombre'];
-    $apellido   = $_SESSION['apellido'];
-
 	include_once '../includes/config.php';
 	include_once '../includes/security.php';
     date_default_timezone_set('America/Managua');
@@ -12,104 +9,79 @@
         !empty($_POST['id_nivel']) &&
         !empty($_POST['id_grado']) &&
         !empty($_POST['id_seccion'])) {
-			
-		//
-		$id_alumno = clean(mysqli_real_escape_string($link,$_POST['id_alumno']));
-        $id_anio = clean(mysqli_real_escape_string($link,$_POST['id_anio']));
-        $id_nivel = clean(mysqli_real_escape_string($link,$_POST['id_nivel']));
-        $id_grado = clean(mysqli_real_escape_string($link,$_POST['id_grado']));
-        $id_seccion = clean(mysqli_real_escape_string($link,$_POST['id_seccion']));
-        $email = clean(mysqli_real_escape_string($link,$_POST['email']));
 
-        // obtener el id de la matricula
-        $queryDato = mysqli_query($link,"SELECT * FROM tbl_matricula
-                                    WHERE ANIO = '$id_anio'
-                                    AND IDALUMNO = '$id_alumno'");
-		$rowData = mysqli_fetch_array($queryDato);
+		$id_alumno = clean($_POST['id_alumno']);
+        $id_anio = clean($_POST['id_anio']);
+        $id_nivel = clean($_POST['id_nivel']);
+        $id_grado = clean($_POST['id_grado']);
+        $id_seccion = clean($_POST['id_seccion']);
+        $email = clean($_POST['email']);
+
+        // obtener el id de la matricula con sentencia preparada
+        $stmtMat = mysqli_prepare($link, "SELECT ID FROM tbl_matricula WHERE ANIO = ? AND IDALUMNO = ?");
+        mysqli_stmt_bind_param($stmtMat, "si", $id_anio, $id_alumno);
+        mysqli_stmt_execute($stmtMat);
+        $resMat = mysqli_stmt_get_result($stmtMat);
+		$rowData = mysqli_fetch_array($resMat);
+
+        if (!$rowData) {
+            echo 'El alumno no tiene matrícula para el año seleccionado';
+            exit;
+        }
         $id_matricula = $rowData['ID'];
 
-        // verificar si el alumno ya esta inscrito en el año lectivo seleccionado
-        $queryConsulta = mysqli_query($link, "SELECT * FROM tbl_inscripcion 
-                                    WHERE ANIOLECTIVO = '$id_anio' 
-                                    AND IDMATRICULA = '$id_matricula'");
-        $bandera = mysqli_num_rows($queryConsulta);
+        // verificar si el alumno ya esta inscrito
+        $stmtInsCheck = mysqli_prepare($link, "SELECT ID FROM tbl_inscripcion WHERE ANIOLECTIVO = ? AND IDMATRICULA = ?");
+        mysqli_stmt_bind_param($stmtInsCheck, "si", $id_anio, $id_matricula);
+        mysqli_stmt_execute($stmtInsCheck);
+        $resInsCheck = mysqli_stmt_get_result($stmtInsCheck);
 
-        if($bandera > 0){
-            echo 'Esta Inscripcion ya fue efectuada';
+        if(mysqli_num_rows($resInsCheck) > 0){
+            echo 'Esta Inscripcion ya fue efectuada para este año lectivo';
         } else {
             // actualizar email de alumno
             if(!empty($email)){
-                $queryUpdateAlumno = mysqli_query($link,"UPDATE tbl_alumnos SET EMAIL = '$email' WHERE IDALUMNO = '$id_alumno'") or die(mysqli_error($link));
+                $stmtUpdE = mysqli_prepare($link, "UPDATE tbl_alumnos SET EMAIL = ? WHERE IDALUMNO = ?");
+                mysqli_stmt_bind_param($stmtUpdE, "si", $email, $id_alumno);
+                mysqli_stmt_execute($stmtUpdE);
             }
 
             // guardar nueva inscripcion
-            $queryInscripcion = mysqli_query($link,"INSERT INTO tbl_inscripcion VALUES (0,'$id_matricula', '$id_alumno', '$id_nivel', '$id_grado', '$id_seccion', '$id_anio', NULL, NULL, 1)") or die(mysqli_error($link));
+            $stmtIns = mysqli_prepare($link, "INSERT INTO tbl_inscripcion (IDMATRICULA, IDALUMNO, IDNIVEL, IDGRADO, SECCION, ANIOLECTIVO, IDTURNO) VALUES (?, ?, ?, ?, ?, ?, 1)");
+            mysqli_stmt_bind_param($stmtIns, "iiiiss", $id_matricula, $id_alumno, $id_nivel, $id_grado, $id_seccion, $id_anio);
+            mysqli_stmt_execute($stmtIns);
             $id_inscripcion = mysqli_insert_id($link);
 
             // guardar historial de pago
-            $queryPago = mysqli_query($link,"INSERT INTO tbl_pagosmensualidades VALUES (0,'$id_inscripcion', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '$id_anio')") or die(mysqli_error($link));
+            $stmtPago = mysqli_prepare($link, "INSERT INTO tbl_pagosmensualidades (IdInscripcion, Anio) VALUES (?, ?)");
+            mysqli_stmt_bind_param($stmtPago, "is", $id_inscripcion, $id_anio);
+            mysqli_stmt_execute($stmtPago);
             $id_pagoMensuales = mysqli_insert_id($link);
 
-            // actualizar historial de pago si tienes pagos efectuados
-            $queryConsultaDos = mysqli_query($link, "SELECT * FROM tbl_cargos AS ca 
+            // Sincronizar pagos si ya existen cargos pagados
+            $stmtCargos = mysqli_prepare($link, "SELECT ca.MesReferencia FROM tbl_cargos AS ca
                                     INNER JOIN tbl_conceptospago cp ON cp.IdConcepto = ca.IdConcepto
                                     INNER JOIN tbl_categoriapago cpa ON cp.IdCategoria = cpa.Id
-                                    WHERE ca.IdAlumno  = '$id_alumno' 
-                                    AND ca.AnioLectivo = '$id_anio'
-                                    AND cpa.Concepto = 'MENSUALIDAD'");
+                                    WHERE ca.IdAlumno  = ? AND ca.AnioLectivo = ? AND cpa.Concepto = 'MENSUALIDAD' AND ca.Saldo <= 0");
+            mysqli_stmt_bind_param($stmtCargos, "is", $id_alumno, $id_anio);
+            mysqli_stmt_execute($stmtCargos);
+            $resCargos = mysqli_stmt_get_result($stmtCargos);
 
-            while($rowConsultaDos = mysqli_fetch_array($queryConsultaDos)){
-                $mes_referencia = $rowConsultaDos['MesReferencia'];
+            while($rowCargo = mysqli_fetch_array($resCargos)){
+                $mes_referencia = $rowCargo['MesReferencia'];
                 $fecha = new DateTime($mes_referencia);
-                // Obtener el número del mes
                 $numeroMes = (int)$fecha->format('m');
-                $mes = "";
-                switch ($numeroMes) {
-                    case 1:
-                        $mes = "Ene";
-                        break;
-                    case 2:
-                        $mes = "Feb";
-                        break;
-                    case 3:
-                        $mes = "Mar";
-                        break;
-                    case 4:
-                        $mes = "Abr";
-                        break;
-                    case 5:
-                        $mes = "May";
-                        break;
-                    case 6:
-                        $mes = "Jun";
-                        break;
-                    case 7:
-                        $mes = "Jul";
-                        break;
-                    case 8:
-                        $mes = "Ago";
-                        break;
-                    case 9:
-                        $mes = "Sep";
-                        break;
-                    case 10:
-                        $mes = "Oct";
-                        break;
-                    case 11:
-                        $mes = "Nov";
-                        break;
-                    case 12:
-                        $mes = "Dic";
-                        break;
-                }
+                $mesAbbr = match($numeroMes) {
+                    1 => 'Ene', 2 => 'Feb', 3 => 'Mar', 4 => 'Abr', 5 => 'May', 6 => 'Jun',
+                    7 => 'Jul', 8 => 'Ago', 9 => 'Sep', 10 => 'Oct', 11 => 'Nov', 12 => 'Dic'
+                };
 
-                // 
-                $queryUpdatePago = mysqli_query($link,"UPDATE tbl_pagosmensualidades SET $mes = 'X' WHERE Anio = '$id_anio' AND Id = '$id_pagoMensuales'") or die(mysqli_error($link));
+                // Actualizar columna del mes
+                mysqli_query($link, "UPDATE tbl_pagosmensualidades SET $mesAbbr = 'X' WHERE Id = $id_pagoMensuales");
             }
-
             echo 'bien';
         }
 	} else {
 		echo "Algunos datos estan vacios";
-	}	
+	}
 ?>

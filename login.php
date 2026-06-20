@@ -11,9 +11,13 @@ if(!empty($_POST['email']) && !empty($_POST['password']))
 	$email = mysqli_real_escape_string($link,$_POST['email']);
 	$pass = mysqli_real_escape_string($link,$_POST['password']);
 
-    //verificamos en la base de datos si existe el usuario
-    $consulta = mysqli_query($link, "SELECT * FROM tbla_usuario WHERE email_usuario='{$email}'");
-    $row = mysqli_fetch_array($consulta);
+    //verificamos en la base de datos si existe el usuario usando Sentencias Preparadas
+    $stmt = mysqli_prepare($link, "SELECT * FROM tbla_usuario WHERE email_usuario = ?");
+    mysqli_stmt_bind_param($stmt, "s", $email);
+    mysqli_stmt_execute($stmt);
+    $resultado = mysqli_stmt_get_result($stmt);
+    $row = mysqli_fetch_array($resultado);
+
     if($row && is_numeric($row['id_usuario']) && $row['id_usuario'] > 0) 
     {
         $passactual = $row['password_usuario'];
