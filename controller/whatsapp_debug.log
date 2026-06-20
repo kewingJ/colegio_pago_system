@@ -1,0 +1,4 @@
+[2025-11-11 22:23:58] UPLOAD HTTP 200 | body={"id":"1550824192776298"} | errno=0 | error=
+[2025-11-11 22:23:58] SEND HTTP 200 | body={"messaging_product":"whatsapp","contacts":[{"input":"50575038506","wa_id":"50575038506"}],"messages":[{"id":"wamid.HBgLNTA1NzUwMzg1MDYVAgARGBI2NjZDRjFFNDAzODcxRDdGQjAA"}]} | errno=0 | error=
+[2025-11-12 15:03:34] UPLOAD HTTP 200 | body={"id":"25048021681566773"} | errno=0 | error=
+[2025-11-12 15:03:35] SEND HTTP 200 | body={"messaging_product":"whatsapp","contacts":[{"input":"50575038506","wa_id":"50575038506"}],"messages":[{"id":"wamid.HBgLNTA1NzUwMzg1MDYVAgARGBJCMDgwRjkwNjQyMzVFNzZENjYA"}]} | errno=0 | error=
