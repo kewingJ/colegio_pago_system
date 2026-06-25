@@ -1,123 +1,47 @@
 <?php
     include_once 'includes/config.php';
     include_once 'includes/security.php';
+    include_once 'includes/Services.php';
 
     date_default_timezone_set('America/Managua');
 	setlocale(LC_ALL,"es_ES");
     
     session_start();
     $id         = $_SESSION['id_usuario'];
-    $nombre     = $_SESSION['nombre'];
-    $apellido   = $_SESSION['apellido'];
+    $nombre_u   = $_SESSION['nombre'];
+    $apellido_u = $_SESSION['apellido'];
     $activo     = $_SESSION['activo'];
     $tipo       = $_SESSION['tipo_usuario'];
+
+    if (empty($id) || empty($activo)) {
+        header("Location: index.html");
+        exit;
+    }
+
+    $paymentService = new PaymentService($link);
     $ano_actual = date('Y');
-    $mes_actual = date('m');
+    $mes_actual = (int)date('m');
+
 	$meses = [
     	1=>'Enero', 2=>'Febrero', 3=>'Marzo', 4=>'Abril',
     	5=>'Mayo', 6=>'Junio', 7=>'Julio', 8=>'Agosto',
     	9=>'Septiembre', 10=>'Octubre', 11=>'Noviembre', 12=>'Diciembre'
 	];
-	$mes_actual_str = $meses[(int)date('n')];
+	$mes_actual_str = $meses[$mes_actual];
     
-    $consult = mysqli_query($link,"SELECT * FROM tbla_usuario WHERE id_usuario = '$id'");
-    $row = mysqli_fetch_array($consult);
-    
-    if (empty($id) || empty($activo)) {
-        header("Location: index.html");
-    }
+    // Obtener alumnos en mora usando el servicio
+    $datos_alumnos_mora = $paymentService->getAlumnosEnMora($ano_actual, $mes_actual);
+    $total_alumnos_mora = count($datos_alumnos_mora);
 
-    $query = mysqli_query($link,"SELECT b.ID AS IdInscripcion, c.NOMBREAPELLIDO
-                FROM tbl_matricula AS a
-                INNER JOIN tbl_inscripcion AS b
-                ON a.ID = b.IDMATRICULA
-                INNER JOIN tbl_alumnos AS c
-                ON a.IDALUMNO = c.IDALUMNO
-                WHERE a.ANIO = '$ano_actual'");
-    $total_alumnos_mora = 0;
-    $contador = 0;
-    while($rowDatos = mysqli_fetch_array($query))
-    {
-        $IdInscripcion = $rowDatos['IdInscripcion'];
-        $nombre = $rowDatos['NOMBREAPELLIDO'];
-
-        $queryDos = mysqli_query($link,"SELECT * FROM tbl_pagosmensualidades
-                    WHERE IdInscripcion = '$IdInscripcion'");
-        $rowDatosDos = mysqli_fetch_array($queryDos);
-        $total_mes_mora = 0;
-        $meses_mora = '';
-        for ($i = 1; $i <= $mes_actual; $i++) {
-            switch ($i) {
-                case 1:
-                    $mes = "Ene";
-                    break;
-                case 2:
-                    $mes = "Feb";
-                    break;
-                case 3:
-                    $mes = "Mar";
-                    break;
-                case 4:
-                    $mes = "Abr";
-                    break;
-                case 5:
-                    $mes = "May";
-                    break;
-                case 6:
-                    $mes = "Jun";
-                    break;
-                case 7:
-                    $mes = "Jul";
-                    break;
-                case 8:
-                    $mes = "Ago";
-                    break;
-                case 9:
-                    $mes = "Sep";
-                    break;
-                case 10:
-                    $mes = "Oct";
-                    break;
-                case 11:
-                    $mes = "Nov";
-                    break;
-                case 12:
-                    $mes = "Dic";
-                    break;
-            }
-
-            if($rowDatosDos[$mes] != 'X'){
-                $total_mes_mora++;
-                $meses_mora .= $mes;
-            }
-        }
-
-        if($total_mes_mora > 0){
-            $total_alumnos_mora++;
-
-            $datos_alumnos_mora[$contador] = array(
-                "nombre" => $resultado = mb_convert_case(mb_strtolower($nombre), MB_CASE_TITLE, "UTF-8"),
-                "total_mes" => $total_mes_mora
-            );
-            $contador++;
-            // echo $total_alumnos_mora.' - '.$nombre.' - '.$IdInscripcion.' - '.$total_mes_mora.' - '.$meses_mora.'<br>';
-        }
-    }
+    // Ingresos del día
+    $total_dia = $paymentService->getTotalIngresosDia(date("Y-m-d"));
 ?>
 <!doctype html>
 <html class="fixed">
 	<head>
-
 		<!-- Basic -->
 		<meta charset="UTF-8">
-
 		<title>Dashboard</title>
-
-		<meta name="keywords" content="HTML5 Admin Template" />
-		<meta name="description" content="Porto Admin - Responsive HTML5 Template">
-		<meta name="author" content="okler.net">
-
-		<!-- Mobile Metas -->
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 
 		<!-- Web Fonts  -->
@@ -135,25 +59,15 @@
 		<link rel="stylesheet" href="assets/vendor/bootstrap-multiselect/css/bootstrap-multiselect.css" />
 		<link rel="stylesheet" href="assets/vendor/morris/morris.css" />
 
-		<link rel="preconnect" href="https://fonts.googleapis.com">
-		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-		<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Titillium+Web:ital,wght@0,200;0,300;0,400;0,600;0,700;0,900;1,200;1,300;1,400;1,600;1,700&display=swap" rel="stylesheet">
-
 		<!-- Theme CSS -->
 		<link rel="stylesheet" href="assets/css/theme.css" />
-
-		<!-- Skin CSS -->
 		<link rel="stylesheet" href="assets/css/skins/default.css" />
-
-		<!-- Theme Custom CSS -->
 		<link rel="stylesheet" href="assets/css/custom.css">
 
 		<!-- Head Libs -->
 		<script src="assets/vendor/modernizr/modernizr.js"></script>
-
-		<script type="text/javascript" src="js/notifIt.js"></script>
-        <link rel="stylesheet" type="text/css" href="css/notifIt.css">
-
+        <!-- SweetAlert2 -->
+        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 	</head>
 	<body>
 		<section class="body">
@@ -164,27 +78,17 @@
 					<a href="home.php" class="logo">
 						<img src="img/Logo-SYSCPE.png" width="75" height="40" alt="Porto Admin" />
 					</a>
-
 					<div class="d-md-none toggle-sidebar-left" data-toggle-class="sidebar-left-opened" data-target="html" data-fire-event="sidebar-left-opened">
 						<i class="fas fa-bars" aria-label="Toggle sidebar"></i>
 					</div>
-
 				</div>
 
-				<!-- start: search & user box -->
 				<div class="header-right">
-
 					<ul class="notifications">
 						<li>
 							<a href="#" class="dropdown-toggle notification-icon" data-bs-toggle="dropdown">
 								<i class="bx bx-bell"></i>
-								<span class="badge">
-                                <?php
-                                    if($total_alumnos_mora > 0){
-                                        echo "+";
-                                    }
-                                ?>
-                                </span>
+								<span class="badge"><?php echo ($total_alumnos_mora > 0) ? "+" : ""; ?></span>
 							</a>
 
 							<div class="dropdown-menu notification-menu">
@@ -196,54 +100,35 @@
 								<div class="content" style="overflow: visible;height: 500px;overflow-y: scroll;scroll-behavior: smooth;">
 									<ul>
                                         <?php
-                                            if($total_alumnos_mora > 0){
-                                                foreach ($datos_alumnos_mora as $item) {
-                                                    $mes = "";
-                                                    if($item['total_mes'] > 1){
-                                                        $mes = "meses";
-                                                    } else {
-                                                        $mes = "mes";
-                                                    }
-                                                    echo '
-                                                    <li>
-                                                        <a href="#" class="clearfix">
-                                                            <div class="image">
-                                                                <i class="fas fa-user bg-danger text-light"></i>
-                                                            </div>
-                                                            <span class="title">'.$item['nombre'].'</span>
-                                                            <span class="message">'.$item['total_mes'].' '.$mes.' de mora de pago</span>
-                                                        </a>
-                                                    </li>';
-                                                }
+                                            foreach ($datos_alumnos_mora as $item) {
+                                                $mesLabel = ($item['total_mes'] > 1) ? "meses" : "mes";
+                                                echo '
+                                                <li>
+                                                    <a href="#" class="clearfix">
+                                                        <div class="image">
+                                                            <i class="fas fa-user bg-danger text-light"></i>
+                                                        </div>
+                                                        <span class="title">'.$item['nombre'].'</span>
+                                                        <span class="message">'.$item['total_mes'].' '.$mesLabel.' de mora</span>
+                                                    </a>
+                                                </li>';
                                             }
                                         ?>
 									</ul>
-
-									<hr />
-
-									<div class="text-end">
-										<a href="#" class="view-more">View All</a>
-									</div>
 								</div>
 							</div>
 						</li>
 					</ul>
-
 					<span class="separator"></span>
-
 				</div>
-				<!-- end: search & user box -->
 			</header>
 			<!-- end: header -->
 
 			<div class="inner-wrapper">
 				<!-- start: sidebar -->
 				<aside id="sidebar-left" class="sidebar-left">
-
 				    <div class="sidebar-header">
-				        <div class="sidebar-title">
-				            Menu
-				        </div>
+				        <div class="sidebar-title">Menu</div>
 				        <div class="sidebar-toggle d-none d-md-block" data-toggle-class="sidebar-left-collapsed" data-target="html" data-fire-event="sidebar-left-toggle">
 				            <i class="fas fa-bars" aria-label="Toggle sidebar"></i>
 				        </div>
@@ -252,7 +137,6 @@
 				    <div class="nano">
 				        <div class="nano-content">
 				            <nav id="menu" class="nav-main" role="navigation">
-
 				                <ul class="nav nav-main">
 				                    <li class="nav-active">
 				                        <a class="nav-link" href="home.php">
@@ -260,230 +144,66 @@
 				                            <span>Dashboard</span>
 				                        </a>                        
 				                    </li>
-                                    <!-- facturacion -->
 				                    <li class="nav-parent">
 				                        <a class="nav-link" href="#">
 				                            <i class="bx bx-detail" aria-hidden="true"></i>
 				                            <span>Facturación</span>
 				                        </a>
 				                        <ul class="nav nav-children">
-				                            <li>
-				                                <a class="nav-link" href="crear_recibos.php">
-				                                    Crear Recibos
-				                                </a>
-				                            </li>
-				                            <li>
-				                                <a class="nav-link" href="inscripcion_alumno.php">
-				                                    Inscripción de alumnos
-				                                </a>
-				                            </li>
-				                            <li>
-				                                <a class="nav-link" href="recibos.php">
-				                                    Recibos
-				                                </a>
-				                            </li>
+				                            <li><a class="nav-link" href="crear_recibos.php">Crear Recibos</a></li>
+				                            <li><a class="nav-link" href="inscripcion_alumno.php">Inscripción de alumnos</a></li>
+				                            <li><a class="nav-link" href="recibos.php">Recibos</a></li>
 				                        </ul>
 				                    </li>
-                                    <!-- reporte -->
                                     <li class="nav-parent">
 				                        <a class="nav-link" href="#">
 				                            <i class="bx bx-file" aria-hidden="true"></i>
 				                            <span>Reportes</span>
 				                        </a>
 				                        <ul class="nav nav-children">
-				                            <li>
-				                                <a class="nav-link" href="reporte_categoria.php">
-				                                    Pagos por categorias
-				                                </a>
-				                            </li>
-				                            <li>
-				                                <a class="nav-link" href="reporte_transporte.php">
-				                                    Pagos de transporte
-				                                </a>
-				                            </li>
-				                            <li>
-				                                <a class="nav-link" href="reporte_grados.php">
-				                                    Pagos por grados
-				                                </a>
-				                            </li>
-                                            <li>
-				                                <a class="nav-link" href="reporte_alumnos.php">
-				                                    Pagos por alumnos
-				                                </a>
-				                            </li>
-                                            <li>
-				                                <a class="nav-link" href="reporte_facturas.php">
-				                                    Caja general
-				                                </a>
-				                            </li>
+				                            <li><a class="nav-link" href="reporte_categoria.php">Pagos por categorias</a></li>
+				                            <li><a class="nav-link" href="reporte_transporte.php">Pagos de transporte</a></li>
+				                            <li><a class="nav-link" href="reporte_grados.php">Pagos por grados</a></li>
+                                            <li><a class="nav-link" href="reporte_alumnos.php">Pagos por alumnos</a></li>
+                                            <li><a class="nav-link" href="reporte_facturas.php">Caja general</a></li>
 				                        </ul>
 				                    </li>
-                                    <!-- catalogo -->
                                     <li class="nav-parent">
 				                        <a class="nav-link" href="#">
 				                            <i class="bx bx-table" aria-hidden="true"></i>
 				                            <span>Menu</span>
 				                        </a>
 				                        <ul class="nav nav-children">
-				                            <li>
-				                                <a class="nav-link" href="alumnos.php">
-				                                    Alumnos
-				                                </a>
-				                            </li>
-				                            <li>
-				                                <a class="nav-link" href="aranceles.php">
-				                                    Aranceles
-				                                </a>
-				                            </li>
-				                            <li>
-				                                <a class="nav-link" href="categoria_pago.php">
-				                                    Categorias de pago
-				                                </a>
-				                            </li>
-                                            <li>
-				                                <a class="nav-link" href="concepto_pago.php">
-				                                    Conceptos de pago
-				                                </a>
-				                            </li>
-                                            <li>
-				                                <a class="nav-link" href="niveles.php">
-				                                    Niveles
-				                                </a>
-				                            </li>
-											<li>
-				                                <a class="nav-link" href="secciones.php">
-				                                    Secciones
-				                                </a>
-				                            </li>
-											<li>
-				                                <a class="nav-link" href="grados.php">
-				                                    Grados
-				                                </a>
-				                            </li>
-                                            <?php
-											if ($_SESSION['tipo_usuario'] == 2) 
-											{
-											?>
-                                            <li>
-				                                <a class="nav-link" href="year_lectivo.php">
-				                                    Activar año lectivo
-				                                </a>
-				                            </li>
-											<?php
-											}
-											?>
+				                            <li><a class="nav-link" href="alumnos.php">Alumnos</a></li>
+				                            <li><a class="nav-link" href="aranceles.php">Aranceles</a></li>
+				                            <li><a class="nav-link" href="categoria_pago.php">Categorias de pago</a></li>
+                                            <li><a class="nav-link" href="concepto_pago.php">Conceptos de pago</a></li>
+                                            <li><a class="nav-link" href="niveles.php">Niveles</a></li>
+											<li><a class="nav-link" href="secciones.php">Secciones</a></li>
+											<li><a class="nav-link" href="grados.php">Grados</a></li>
+                                            <?php if ($_SESSION['tipo_usuario'] == 2) { ?>
+                                            <li><a class="nav-link" href="year_lectivo.php">Activar año lectivo</a></li>
+											<?php } ?>
 				                        </ul>
 				                    </li>
-									<!-- prematricula -->
-                                    <li>
-				                        <a class="nav-link" href="pre_matricula.php">
-				                            <i class="fa fa-users" aria-hidden="true"></i>
-				                            <span>Pre-Matricula</span>
-				                        </a>                        
-				                    </li>
-                                    <!-- usuarios -->
-                                    <?php
-									if ($_SESSION['tipo_usuario'] == 2) 
-									{
-									?>
-                                    <li>
-				                        <a class="nav-link" href="usuarios.php">
-				                            <i class="bx bx-user" aria-hidden="true"></i>
-				                            <span>Usuarios</span>
-				                        </a>                        
-				                    </li>
-									<?php
-									}
-									?>
-                                    <!-- emails -->
-                                    <?php
-									if ($_SESSION['tipo_usuario'] == 2) 
-									{
-									?>
-                                    <li>
-				                        <a class="nav-link" href="config_email.php">
-				                            <i class="bx bx-envelope" aria-hidden="true"></i>
-				                            <span>Config Email</span>
-				                        </a>                        
-				                    </li>
-									<?php
-									}
-									?>
-									<?php
-									if ($_SESSION['tipo_usuario'] == 2) 
-									{
-									?>
-										<!-- edit colegio -->
-										<li>
-											<a class="nav-link" href="config_colegio.php">
-												<i class="fa fa-school" aria-hidden="true"></i>
-												<span>Config Colegio</span>
-											</a>                        
-										</li>
-									<?php
-									}
-									?>
-									<?php
-									if ($_SESSION['tipo_usuario'] == 2) 
-									{
-									?>
-										<!-- limpiar data solo admin -->
-										<li>
-											<a class="nav-link" id="btnEliminarData">
-												<i class="fa fa-trash" href="#0" aria-hidden="true"></i>
-												<span>Limpiar Data</span>
-											</a>                        
-										</li>
-									<?php
-									}
-									?>
-									<?php
-									if ($_SESSION['tipo_usuario'] == 2) 
-									{
-									?>
-										<!-- Descargar data -->
-										<li>
-											<a href="backup.php">
-												<i class="fa fa-download" href="#0" aria-hidden="true"></i>
-												<span>Descargar respaldo BD</span>
-											</a>                        
-										</li>
-									<?php
-									}
-									?>
-                                    <!-- salir -->
-                                    <li>
-				                        <a class="nav-link" href="salir.php">
-				                            <i class="fa fa-sign-out" aria-hidden="true"></i>
-				                            <span>Cerrar sesión</span>
-				                        </a>                        
-				                    </li>
+                                    <li><a class="nav-link" href="pre_matricula.php"><i class="fa fa-users" aria-hidden="true"></i><span>Pre-Matricula</span></a></li>
+                                    <?php if ($_SESSION['tipo_usuario'] == 2) { ?>
+                                    <li><a class="nav-link" href="usuarios.php"><i class="bx bx-user" aria-hidden="true"></i><span>Usuarios</span></a></li>
+                                    <li><a class="nav-link" href="config_email.php"><i class="bx bx-envelope" aria-hidden="true"></i><span>Config Email</span></a></li>
+									<li><a class="nav-link" href="config_colegio.php"><i class="fa fa-school" aria-hidden="true"></i><span>Config Colegio</span></a></li>
+									<li><a class="nav-link" id="btnEliminarData"><i class="fa fa-trash" aria-hidden="true"></i><span>Limpiar Data</span></a></li>
+									<li><a href="backup.php"><i class="fa fa-download" aria-hidden="true"></i><span>Descargar respaldo BD</span></a></li>
+									<?php } ?>
+                                    <li><a class="nav-link" href="salir.php"><i class="fa fa-sign-out" aria-hidden="true"></i><span>Cerrar sesión</span></a></li>
 				                </ul>
 				            </nav>
 				        </div>
-
-				        <script>
-				            // Maintain Scroll Position
-				            if (typeof localStorage !== 'undefined') {
-				                if (localStorage.getItem('sidebar-left-position') !== null) {
-				                    var initialPosition = localStorage.getItem('sidebar-left-position'),
-				                        sidebarLeft = document.querySelector('#sidebar-left .nano-content');
-
-				                    sidebarLeft.scrollTop = initialPosition;
-				                }
-				            }
-				        </script>
-
 				    </div>
-
 				</aside>
-				<!-- end: sidebar -->
 
 				<section role="main" class="content-body">
-					<header class="page-header">
-					</header>
+					<header class="page-header"></header>
 
-					<!-- start: page -->
 					<div class="row">
                         <div class="col-lg-12">
 							<div class="row">
@@ -492,10 +212,7 @@
 										<div class="card-body">
 											<div class="widget-summary">
 												<div class="widget-summary-col widget-summary-col-icon">
-													<div class="summary-icon">
-														<!-- <i class="fas fa-life-ring"></i> -->
-														<img src="img/school_students_icon_144607.png" style="width: 100%;"/>
-													</div>
+													<div class="summary-icon"><img src="img/school_students_icon_144607.png" style="width: 100%;"/></div>
 												</div>
 												<div class="widget-summary-col">
 													<div class="summary">
@@ -503,18 +220,16 @@
 														<div class="info">
 															<strong class="amount">
                                                                 <?php
-                                                                    $queryTotal = mysqli_query($link,"SELECT COUNT(matricula.ID) AS TOTAL FROM tbl_matricula matricula
-																													INNER JOIN tbl_alumnos alumno ON matricula.IDALUMNO = alumno.IDALUMNO
-																													WHERE matricula.ANIO = '$ano_actual'");
-                                                                    $totalA = mysqli_fetch_array($queryTotal);
-                                                                    echo $totalA['TOTAL'];
+                                                                    $stmtTotal = mysqli_prepare($link, "SELECT COUNT(m.ID) AS TOTAL FROM tbl_matricula m INNER JOIN tbl_alumnos a ON m.IDALUMNO = a.IDALUMNO WHERE m.ANIO = ?");
+                                                                    mysqli_stmt_bind_param($stmtTotal, "s", $ano_actual);
+                                                                    mysqli_stmt_execute($stmtTotal);
+                                                                    $resT = mysqli_fetch_assoc(mysqli_stmt_get_result($stmtTotal));
+                                                                    echo $resT['TOTAL'];
                                                                 ?>
                                                             </strong>
 														</div>
 													</div>
-													<div class="summary-footer">
-														<a class="text-muted text-uppercase" href="alumnos_inscritos.php">Ver más</a>
-													</div>
+													<div class="summary-footer"><a class="text-muted text-uppercase" href="alumnos_inscritos.php">Ver más</a></div>
 												</div>
 											</div>
 										</div>
@@ -526,23 +241,14 @@
 										<div class="card-body">
 											<div class="widget-summary">
 												<div class="widget-summary-col widget-summary-col-icon">
-													<div class="summary-icon">
-														<!-- <i class="fas fa-life-ring"></i> -->
-														<img src="img/business_man_user_alert_alerttheuser_askthecustomer_negocio_2331.png" style="width: 100%;"/>
-													</div>
+													<div class="summary-icon"><img src="img/business_man_user_alert_alerttheuser_askthecustomer_negocio_2331.png" style="width: 100%;"/></div>
 												</div>
 												<div class="widget-summary-col">
 													<div class="summary">
 														<h4 class="title">Alumnos en mora <?php echo $mes_actual_str; ?></h4>
-														<div class="info">
-															<strong class="amount">
-                                                                <?php echo $total_alumnos_mora; ?>
-                                                            </strong>
-														</div>
+														<div class="info"><strong class="amount"><?php echo $total_alumnos_mora; ?></strong></div>
 													</div>
-													<div class="summary-footer">
-														<a class="text-muted text-uppercase" href="alumnos_mora.php">Ver más</a>
-													</div>
+													<div class="summary-footer"><a class="text-muted text-uppercase" href="alumnos_mora.php">Ver más</a></div>
 												</div>
 											</div>
 										</div>
@@ -554,34 +260,12 @@
 										<div class="card-body">
 											<div class="widget-summary">
 												<div class="widget-summary-col widget-summary-col-icon">
-													<div class="summary-icon">
-														<!-- <i class="fas fa-life-ring"></i> -->
-														<img src="img/cash_icon-icons.com_51090.png" style="width: 100%;"/>
-													</div>
+													<div class="summary-icon"><img src="img/cash_icon-icons.com_51090.png" style="width: 100%;"/></div>
 												</div>
 												<div class="widget-summary-col">
 													<div class="summary">
 														<h4 class="title">Total ingreso por dia</h4>
-														<div class="info">
-															<strong class="amount">
-                                                            <?php
-                                                                //obtener la fecha actual
-                                                                $fecha_actual = date("Y-m-d");
-
-                                                                $queryTotal = mysqli_query($link,"SELECT SUM(MontoTotal) as total FROM tbl_recibomaestro 
-                                                                WHERE DATE(Fecha) = '$fecha_actual' AND Estado = 1");
-                                                                $row = mysqli_fetch_array($queryTotal);
-                                                                if(empty($row['total'])){
-                                                                    echo 'C$0';
-                                                                } else {
-                                                                    echo 'C$'.$row['total'];
-                                                                }
-                                                            ?>
-                                                            </strong>
-														</div>
-													</div>
-													<div class="summary-footer">
-														<!-- <a class="text-muted text-uppercase" href="#">(withdraw)</a> -->
+														<div class="info"><strong class="amount">C$ <?php echo number_format($total_dia, 2); ?></strong></div>
 													</div>
 												</div>
 											</div>
@@ -594,10 +278,7 @@
 										<div class="card-body">
 											<div class="widget-summary">
 												<div class="widget-summary-col widget-summary-col-icon">
-													<div class="summary-icon">
-														<!-- <i class="fas fa-life-ring"></i> -->
-														<img src="img/money_dollar_arrows_refresh_update_business_finance_investment_icon_188624.png" style="width: 100%;"/>
-													</div>
+													<div class="summary-icon"><img src="img/money_dollar_arrows_refresh_update_business_finance_investment_icon_188624.png" style="width: 100%;"/></div>
 												</div>
 												<div class="widget-summary-col">
 													<div class="summary">
@@ -605,17 +286,14 @@
 														<div class="info">
 															<strong class="amount">
                                                             <?php
-                                                                $queryTasa = mysqli_query($link,"SELECT * FROM tasa_cambio WHERE activo_tasa = 1");
-                                                                $rowTasa = mysqli_fetch_array($queryTasa);
-                                                                $tasa = $rowTasa['tasa'];
-                                                                echo 'C$'.$tasa;
+                                                                $resTasa = mysqli_query($link,"SELECT tasa FROM tasa_cambio WHERE activo_tasa = 1 LIMIT 1");
+                                                                $rowTasa = mysqli_fetch_assoc($resTasa);
+                                                                echo 'C$'.($rowTasa['tasa'] ?? '0');
                                                             ?>
                                                             </strong>
 														</div>
 													</div>
-													<div class="summary-footer">
-														<a class="text-muted text-uppercase" href="#0" data-bs-toggle="modal" data-bs-target="#ModalNuevaTasa" >Actualizar tasa de cambio</a>
-													</div>
+													<div class="summary-footer"><a class="text-muted text-uppercase" href="#0" data-bs-toggle="modal" data-bs-target="#ModalNuevaTasa" >Actualizar tasa</a></div>
 												</div>
 											</div>
 										</div>
@@ -627,346 +305,108 @@
                         <div class="col-lg-12">
 							<section class="card">
 								<div class="card-body">
-									<div class="row">
-										<div class="col-xl-12">
-											<div class="chart-data-selector" id="salesSelectorWrapper">
-												<h2>
-													Ingresos por dias de la semana <?php echo $numeroSemana = date('W'); ?>
-												</h2>
-
-												<div id="salesSelectorItems" class="chart-data-selector-items mt-3">
-													<div id="container"></div>
-												</div>
-
-											</div>
-										</div>
+									<div class="chart-data-selector">
+										<h2>Ingresos por dias de la semana</h2>
+										<div id="container" style="height: 400px;"></div>
 									</div>
 								</div>
 							</section>
 						</div>
 					</div>
 
-					<!-- Modal correo alumno-->
-					<div class="modal fade" id="ModalNuevaTasa" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
-						<div class="modal-dialog" role="document">
+					<!-- Modales -->
+					<div class="modal fade" id="ModalNuevaTasa">
+						<div class="modal-dialog">
 							<div class="modal-content">
-								<div class="modal-header">
-									<h5 class="modal-title" id="exampleModalLabel"></h5>
-								</div>
+								<div class="modal-header"><h5 class="modal-title">Actualizar Tasa</h5></div>
 								<div class="modal-body">
-									<form id="Form3" class="FormAlumno" action="" method="" autocomplete="off">
-
-										<div class="col-md-12">
-											<label>Tasa de cambio</label>
-											<input type="text" class="form-control" id="tasa_cambio" name="tasa_cambio" placeholder="">
-										</div>
-
-										<div class="text-center col-md-12 mt-3">
-											<button class="btn btn-default" data-dismiss="modal" type="reset"><i class="fa fa-close"></i> Cancelar</button>
-											<button class="btn btn-primary" type="button" id="btnGuardarTasaCambio"><i class="fa fa-save"></i> Guardar</button>
+									<form id="Form3" autocomplete="off">
+										<label>Tasa de cambio</label>
+										<input type="text" class="form-control" id="tasa_cambio" name="tasa_cambio">
+										<div class="text-center mt-3">
+											<button class="btn btn-default" data-bs-dismiss="modal">Cancelar</button>
+											<button class="btn btn-primary" type="button" id="btnGuardarTasaCambio">Guardar</button>
 										</div>
 									</form>
 								</div>
-								<div class="modal-footer"></div>
 							</div>
 						</div>
 					</div>
 
-					<!-- Modal eliminar -->
 					<div class="modal fade" id="modalEliminarData">
 						<div class="modal-dialog">
 							<div class="modal-content">
-								<div class="modal-header">
-									<h5 class="modal-title">Eliminar</h5>
-								</div>
+								<div class="modal-header"><h5 class="modal-title">Eliminar Datos</h5></div>
 								<div class="modal-body">
-									<form id="Form2" class="FormC" action="" method="" autocomplete="off">
-										<h4 class="text-center">¿Esta seguro de eliminar los datos?</h4>
-										<input type="hidden" name="id_alumno" id="id_alumno">
-											
-										<div class="text-center col-md-12">
-											<button class="btn btn-default" data-dismiss="modal" type="reset"><i class="fa fa-close"></i> Cancelar</button>
-											<button class="btn btn-danger" type="button" id="btnEliminarData2"><i class="fa fa-trash"></i> Elimimar</button>
-										</div>
-									</form>
-								</div>
-								<div class="modal-footer">
+									<h4 class="text-center">¿Esta seguro de eliminar los datos?</h4>
+									<div class="text-center mt-3">
+										<button class="btn btn-default" data-bs-dismiss="modal">Cancelar</button>
+										<button class="btn btn-danger" type="button" id="btnEliminarData2">Elimimar</button>
+									</div>
 								</div>
 							</div>
-							<!-- /.modal-content -->
 						</div>
-						<!-- /.modal-dialog -->
 					</div>
-
-					<!-- end: page -->
 				</section>
 			</div>
 
-			<!-- /.content-wrapper -->
-            <footer class="main-footer" style="background-image: url('img/Footer_SYS.png'); padding: 100px;border-top: 0px solid #d2d6de;background-color: #ecf0f5;border-top: 0px solid #d2d6de; background-color: #ecf0f5;background-size: cover; background-repeat: no-repeat;">
+            <footer class="main-footer" style="background-image: url('img/Footer_SYS.png'); padding: 100px; background-size: cover;">
                 <div class="pull-right hidden-xs" style="color: yellow;margin-top: 40px;">
                     Desarrollado por <a href="https://netsoluciones.com" target="_blank" style="color: yellow">Netsoluciones</a>
                 </div>
             </footer>
-
 		</section>
 
 		<!-- Vendor -->
 		<script src="assets/vendor/jquery/jquery.js"></script>
-		<script src="assets/vendor/jquery-browser-mobile/jquery.browser.mobile.js"></script>
-		<script src="assets/vendor/popper/umd/popper.min.js"></script>
 		<script src="assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
-		<script src="assets/vendor/bootstrap-datepicker/js/bootstrap-datepicker.js"></script>
 		<script src="assets/vendor/common/common.js"></script>
 		<script src="assets/vendor/nanoscroller/nanoscroller.js"></script>
-		<script src="assets/vendor/magnific-popup/jquery.magnific-popup.js"></script>
-		<script src="assets/vendor/jquery-placeholder/jquery.placeholder.js"></script>
+        <script src="js/highcharts/highcharts.js"></script>
 
-		<!-- Specific Page Vendor -->
-		<script src="assets/vendor/jquery-ui/jquery-ui.js"></script>
-		<script src="assets/vendor/jqueryui-touch-punch/jquery.ui.touch-punch.js"></script>
-		<script src="assets/vendor/jquery-appear/jquery.appear.js"></script>
-		<script src="assets/vendor/bootstrap-multiselect/js/bootstrap-multiselect.js"></script>
-		<script src="assets/vendor/jquery.easy-pie-chart/jquery.easypiechart.js"></script>
-		<script src="assets/vendor/flot/jquery.flot.js"></script>
-		<script src="assets/vendor/flot.tooltip/jquery.flot.tooltip.js"></script>
-		<script src="assets/vendor/flot/jquery.flot.pie.js"></script>
-		<script src="assets/vendor/flot/jquery.flot.categories.js"></script>
-		<script src="assets/vendor/flot/jquery.flot.resize.js"></script>
-		<script src="assets/vendor/jquery-sparkline/jquery.sparkline.js"></script>
-		<script src="assets/vendor/raphael/raphael.js"></script>
-		<script src="assets/vendor/morris/morris.js"></script>
-		<script src="assets/vendor/gauge/gauge.js"></script>
-		<script src="assets/vendor/snap.svg/snap.svg.js"></script>
-		<script src="assets/vendor/liquid-meter/liquid.meter.js"></script>
-		<script src="assets/vendor/jqvmap/jquery.vmap.js"></script>
-		<script src="assets/vendor/jqvmap/data/jquery.vmap.sampledata.js"></script>
-		<script src="assets/vendor/jqvmap/maps/jquery.vmap.world.js"></script>
-		<script src="assets/vendor/jqvmap/maps/continents/jquery.vmap.africa.js"></script>
-		<script src="assets/vendor/jqvmap/maps/continents/jquery.vmap.asia.js"></script>
-		<script src="assets/vendor/jqvmap/maps/continents/jquery.vmap.australia.js"></script>
-		<script src="assets/vendor/jqvmap/maps/continents/jquery.vmap.europe.js"></script>
-		<script src="assets/vendor/jqvmap/maps/continents/jquery.vmap.north-america.js"></script>
-		<script src="assets/vendor/jqvmap/maps/continents/jquery.vmap.south-america.js"></script>
-
-        <!-- Highcharts -->
-        <script src="js/highcharts/highcharts.js"> </script>
-        <script src="js/highcharts/modules/exporting.js"></script>
-        <script src="js/highcharts/modules/export-data.js"></script>
-        <script src="js/highcharts/modules/accessibility.js"></script>
-
-		<!-- Theme Base, Components and Settings -->
-		<script src="assets/js/theme.js"></script>
-
-		<!-- Theme Custom -->
-		<script src="assets/js/custom.js"></script>
-
-		<!-- Theme Initialization Files -->
-		<script src="assets/js/theme.init.js"></script>
-
-		<!-- Examples -->
-		<script src="assets/js/examples/examples.dashboard.js"></script>
-
-        <!-- grafica principal -->
         <script>
             Highcharts.chart('container', {
-                chart: {
-                    type: 'bar'
-                },
-                title: {
-                    text: '',
-                    align: 'left'
-                },
-                subtitle: {
-                    text: '',
-                    align: 'left'
-                },
-                xAxis: {
-                    categories: ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado', 'Domingo'],
-                    title: {
-                        text: null
-                    },
-                    gridLineWidth: 1,
-                    lineWidth: 0
-                },
-                yAxis: {
-                    min: 0,
-                    title: {
-                        text: 'Total',
-                        align: 'high'
-                    },
-                    labels: {
-                        overflow: 'justify'
-                    },
-                    gridLineWidth: 0
-                },
-                tooltip: {
-                    valueSuffix: '$'
-                },
-                plotOptions: {
-                    bar: {
-                        borderRadius: '0%',
-                        dataLabels: {
-                            enabled: true
-                        },
-                        groupPadding: 0.1
-                    }
-                },
-                legend: {
-                    layout: 'vertical',
-                    align: 'right',
-                    verticalAlign: 'top',
-                    x: -40,
-                    y: 80,
-                    floating: true,
-                    borderWidth: 1,
-                    backgroundColor:
-                        Highcharts.defaultOptions.legend.backgroundColor || '#FFFFFF',
-                    shadow: true
-                },
-                credits: {
-                    enabled: false
-                },
+                chart: { type: 'bar' },
+                title: { text: 'Ingresos de la Semana' },
+                xAxis: { categories: ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado', 'Domingo'] },
+                yAxis: { title: { text: 'Monto (C$)' } },
                 series: [{
-                    <?php
-                        $numeroSemana = date('W');
-                        echo "name: 'Semana ".$numeroSemana."',";
-                        echo "data: [";
-
-                        // Obtén la fecha actual
-                        $fechaActual = new DateTime();
-                        $diaSemana = $fechaActual->format('N');
-                        $primerDiaSemana = $fechaActual->sub(new DateInterval('P' . ($diaSemana - 1) . 'D'))->format('Y-m-d');
+                    name: 'Ingresos',
+                    data: [
+                        <?php
+                        $fecha = new DateTime();
+                        $dia = (int)$fecha->format('N');
+                        $fecha->sub(new DateInterval('P' . ($dia - 1) . 'D'));
                         for ($i = 0; $i < 7; $i++) {
-                            $fecha_pago = $fechaActual->format('Y-m-d');
-
-                            //
-                            $queryConsulta = mysqli_query($link,"SELECT SUM(MontoTotal) as VALOR FROM tbl_recibomaestro 
-                                                            WHERE DATE(Fecha) = '$fecha_pago' AND Estado = 1");
-                            while($rowConsulta = mysqli_fetch_array($queryConsulta)){
-                                if(empty($rowConsulta['VALOR'])){
-                                    echo "0,";
-                                } else {
-                                    echo $rowConsulta['VALOR'].",";
-                                }
-                            }
-                            $fechaActual->add(new DateInterval('P1D')); // Añade un día
+                            echo $paymentService->getTotalIngresosDia($fecha->format('Y-m-d')) . ",";
+                            $fecha->add(new DateInterval('P1D'));
                         }
-                        echo "]";
-                    ?>
+                        ?>
+                    ]
                 }]
             });
-        </script>
 
-		<script>
-			$(document).ready(function(){
-                // primer paso
-                $(document).on('click', '#btnEliminarData', function(e){
-                    e.preventDefault();
-                    $('#modalEliminarData').modal('show');
-                });
-
-				// segundo paso
-                $(document).on('click', '#btnEliminarData2', function(e){
-                    e.preventDefault();
-                    $.ajax({
-                        type: 'POST',
-                        url: 'controller/clean_db.php',
-                        success: function(data) {
-                            if (data == 'bien') {
-								location.reload();
-                            } else {
-                                alert("Error al eliminar los datos");
-                            }
-                        }
-                    });      
-                });
-
-			});
-		</script>
-
-		<script>
 			$("#btnGuardarTasaCambio").click(function() {
-                var tasa_cambio = $("#tasa_cambio").val();
-                if (tasa_cambio == "") {
-                    notif({
-                        msg: "Debe ingresar la tasa de cambio",
-                        type: "error",
-						position: "center"
-                    });
-                } else {
-                    $.ajax({
-                        type: "POST",
-                        url: "controller/g_tasa_cambio.php",
-                        data: {
-                            tasa_cambio: tasa_cambio
-                        },
-                        success: function (data) {
-                            if (data == 'bien') {
-                                notif({
-                                    msg: "Tasa de cambio actualizada",
-                                    type: "success",
-									position: "center"
-                                });
-                                // $("#ModalNuevaTasa").modal("hide");
-                                setTimeout("location.href = 'home.php'",2000);
-                            } else {
-                                notif({
-                                    msg: "Error al actualizar la tasa de cambio",
-                                    type: "error",
-									position: "center"
-                                });
-                            }
-                        }
-                    });
+                const tasa = $("#tasa_cambio").val();
+                if (!tasa) {
+                    Swal.fire('Error', 'Ingrese una tasa válida', 'error');
+                    return;
                 }
+                $.post("controller/g_tasa_cambio.php", { tasa_cambio: tasa }, function(data) {
+                    if (data == 'bien') {
+                        Swal.fire('Éxito', 'Tasa actualizada', 'success').then(() => location.reload());
+                    } else {
+                        Swal.fire('Error', 'No se pudo actualizar', 'error');
+                    }
+                });
+            });
+
+            $("#btnEliminarData2").click(function() {
+                $.post("controller/clean_db.php", function(data) {
+                    if (data == 'bien') location.reload();
+                    else Swal.fire('Error', 'No se pudo limpiar la data', 'error');
+                });
             });
         </script>
-
-		<script>
-			(function () {
-			// Solo convertir si realmente es un componente de Bootstrap
-			const BS_TOGGLES = new Set(['modal','collapse','dropdown','tab','tooltip','popover','offcanvas','button']);
-
-			// data-toggle => data-bs-toggle (conservar el original)
-			document.querySelectorAll('[data-toggle]').forEach(el => {
-				const v = el.getAttribute('data-toggle');
-				if (BS_TOGGLES.has(v)) {
-				if (!el.hasAttribute('data-bs-toggle')) {
-					el.setAttribute('data-bs-toggle', v);
-				}
-				// No borrar data-toggle
-				}
-			});
-
-			// data-target => data-bs-target (solo si va con un toggle de Bootstrap; NO tocar toggles del tema)
-			document.querySelectorAll('[data-target]').forEach(el => {
-				// Excluir controles propios del tema Porto Admin
-				if (el.hasAttribute('data-toggle-class')) return;
-				if (el.classList.contains('toggle-sidebar-left')) return;
-
-				const v = el.getAttribute('data-target');
-				const hasBSToggle = el.hasAttribute('data-toggle') && BS_TOGGLES.has(el.getAttribute('data-toggle'));
-				const looksLikeBSTrigger = el.classList.contains('navbar-toggler') || el.classList.contains('dropdown-toggle');
-
-				if (hasBSToggle || looksLikeBSTrigger) {
-				if (!el.hasAttribute('data-bs-target')) {
-					el.setAttribute('data-bs-target', v);
-				}
-				// No borrar data-target (el tema lo necesita)
-				}
-			});
-
-			// data-dismiss => data-bs-dismiss (conservar el original)
-			document.querySelectorAll('[data-dismiss]').forEach(el => {
-				const v = el.getAttribute('data-dismiss');
-				if (!el.hasAttribute('data-bs-dismiss')) {
-				el.setAttribute('data-bs-dismiss', v);
-				}
-				// No borrar data-dismiss
-			});
-			})();
-		</script>
-
 	</body>
 </html>
