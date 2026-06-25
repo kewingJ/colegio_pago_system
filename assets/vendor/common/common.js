@@ -39,3 +39,13 @@ if( $('html.simple-sticky-header-enabled').get(0) ) {
 		}
 	});
 }
+
+// jQuery $.browser polyfill (removed in jQuery 1.9, required by theme.js)
+if (typeof jQuery !== 'undefined' && !jQuery.browser) {
+	jQuery.browser = {};
+	jQuery.browser.mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+	jQuery.browser.chrome  = /chrom(e|ium)/i.test(navigator.userAgent);
+	jQuery.browser.webkit  = /webkit/i.test(navigator.userAgent);
+	jQuery.browser.msie    = /msie|trident/i.test(navigator.userAgent);
+	jQuery.browser.mozilla = /mozilla/i.test(navigator.userAgent) && !/webkit|trident/i.test(navigator.userAgent);
+}

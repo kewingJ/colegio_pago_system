@@ -362,10 +362,12 @@
 		<script src="assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 		<script src="assets/vendor/common/common.js"></script>
 		<script src="assets/vendor/nanoscroller/nanoscroller.js"></script>
+		<script src="assets/js/theme.js"></script>
         <script src="js/highcharts/highcharts.js"></script>
 
         <script>
             Highcharts.chart('container', {
+                accessibility: { enabled: false },
                 chart: { type: 'bar' },
                 title: { text: 'Ingresos de la Semana' },
                 xAxis: { categories: ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado', 'Domingo'] },
