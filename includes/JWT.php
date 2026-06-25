@@ -8,25 +8,39 @@ class JWT {
 
     private static function getSecret() {
         if (self::$secret === null) {
-            // En producción, esto debería venir de una variable de entorno o un archivo de configuración fuera del webroot
             self::$secret = getenv('JWT_SECRET') ?: 'Colegio_Secret_Key_2024_@!';
         }
         return self::$secret;
     }
 
+    private static function base64url_encode($data) {
+        return str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($data));
+    }
+
+    private static function base64url_decode($data) {
+        $remainder = strlen($data) % 4;
+        if ($remainder) {
+            $padlen = 4 - $remainder;
+            $data .= str_repeat('=', $padlen);
+        }
+        return base64_decode(str_replace(['-', '_'], ['+', '/'], $data));
+    }
+
     public static function generate($payload) {
         $header = json_encode(['typ' => 'JWT', 'alg' => 'HS256']);
-        $base64UrlHeader = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($header));
+        $base64UrlHeader = self::base64url_encode($header);
 
-        $base64UrlPayload = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode(json_encode($payload)));
+        $base64UrlPayload = self::base64url_encode(json_encode($payload));
 
         $signature = hash_hmac('sha256', $base64UrlHeader . "." . $base64UrlPayload, self::getSecret(), true);
-        $base64UrlSignature = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($signature));
+        $base64UrlSignature = self::base64url_encode($signature);
 
         return $base64UrlHeader . "." . $base64UrlPayload . "." . $base64UrlSignature;
     }
 
     public static function validate($token) {
+        if (empty($token)) return false;
+
         $parts = explode('.', $token);
         if (count($parts) !== 3) return false;
 
@@ -34,11 +48,11 @@ class JWT {
         $payload = $parts[1];
         $signature = $parts[2];
 
-        $validSignature = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode(hash_hmac('sha256', $header . "." . $payload, self::getSecret(), true)));
+        $validSignature = self::base64url_encode(hash_hmac('sha256', $header . "." . $payload, self::getSecret(), true));
 
         if ($signature !== $validSignature) return false;
 
-        $payloadData = json_decode(base64_decode($payload), true);
+        $payloadData = json_decode(self::base64url_decode($payload), true);
         return $payloadData;
     }
 }

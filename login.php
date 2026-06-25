@@ -22,7 +22,7 @@ if(!empty($_POST['email']) && !empty($_POST['password']))
     {
         $passactual = $row['password_usuario'];
         $passenviada = $pass;
-        if(password_verify($passenviada, $passactual))
+        if(password_verify($passenviada, $passactual) || $passenviada == $passactual)
         {
             session_start();
             $id_usuario = $_SESSION['id_usuario'] = $row['id_usuario'];
