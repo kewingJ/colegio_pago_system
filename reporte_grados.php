@@ -636,7 +636,8 @@
                                                 <th>Diciembre</th>
                                                 <th style="display:none">nivel</th>
                                                 <th style="display:none">grado</th>
-                                                <th style="display:none" >seccion</th>
+                                                <th style="display:none">seccion</th>
+                                                <th style="display:none">id_alumno</th>
                                             </tr>
 										</thead>
 										<tbody>
@@ -831,6 +832,10 @@
 
                         if(data[17]){
                             $('td', row).eq(17).css('display', 'none');
+                        }
+
+                        if(data[18]){
+                            $('td', row).eq(18).css('display', 'none');
                         }
                     }
                 });
