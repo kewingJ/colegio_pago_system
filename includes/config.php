@@ -2,7 +2,7 @@
 define('DB_SERVER', 'localhost');
 define('DB_USERNAME', 'root');
 define('DB_PASSWORD', '');
-define('DB_DATABASE', 'db_cole');
+define('DB_DATABASE', 'colegio_db_data');
 $link = mysqli_connect(DB_SERVER, DB_USERNAME, DB_PASSWORD,DB_DATABASE) or die(mysqli_error($link));
 @mysqli_query($link,"SET NAMES 'utf8'");
 
@@ -13,7 +13,7 @@ $redis_port = 6379;
 $sql_details = array(
     'user' => 'root',
     'pass' => '',
-    'db'   => 'db_cole',
+    'db'   => 'colegio_db_data',
     'host' => 'localhost'
 );
 

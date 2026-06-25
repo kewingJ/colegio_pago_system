@@ -77,8 +77,8 @@ class AlumnoService {
                 "id" => $id,
                 "carnet" => $codigo,
                 "nombre" => mb_convert_case(mb_strtolower($row['NOMBREAPELLIDO']), MB_CASE_TITLE, "UTF-8"),
-                "padre" => $row['NOMBREPADRE'],
-                "madre" => $row['NOMBREMADRE'],
+                "padre" => mb_convert_case(mb_strtolower($row['NOMBREPADRE']), MB_CASE_TITLE, "UTF-8"),
+                "madre" => mb_convert_case(mb_strtolower($row['NOMBREMADRE']), MB_CASE_TITLE, "UTF-8"),
                 "contacto" => [
                     "telefono" => $row['TELEFONO'],
                     "email" => $row['EMAIL']
