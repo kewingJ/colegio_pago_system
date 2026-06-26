@@ -35,32 +35,38 @@ class AlumnoService {
     }
 
     public function getListaCompletaAlumnos() {
-        // Obtenemos todos los alumnos y sus estados de matrícula e inscripción de forma cruzada
+        // Obtenemos la última información de matrícula/inscripción de cada alumno
         $sql = "SELECT
                     a.IDALUMNO, a.NOMBREAPELLIDO, a.CODIGO, a.NOMBREMADRE, a.NOMBREPADRE, a.TELEFONO, a.EMAIL,
                     m.ANIO as ANIO_MATRICULA,
-                    i.ANIOLECTIVO as ANIO_INSCRIPCION
+                    i.ANIOLECTIVO as ANIO_INSCRIPCION,
+                    g.Grado as NOMBRE_GRADO,
+                    n.Nivel as NOMBRE_NIVEL,
+                    i.SECCION
                 FROM tbl_alumnos a
-                LEFT JOIN tbl_matricula m ON a.IDALUMNO = m.IDALUMNO
-                LEFT JOIN tbl_inscripcion i ON a.IDALUMNO = i.IDALUMNO AND i.IDMATRICULA = m.ID
-                ORDER BY a.IDALUMNO DESC, m.ANIO DESC";
+                LEFT JOIN (
+                    SELECT IDALUMNO, MAX(ANIO) as MAX_ANIO
+                    FROM tbl_matricula
+                    GROUP BY IDALUMNO
+                ) m_latest ON a.IDALUMNO = m_latest.IDALUMNO
+                LEFT JOIN tbl_matricula m ON m.IDALUMNO = a.IDALUMNO AND m.ANIO = m_latest.MAX_ANIO
+                LEFT JOIN tbl_inscripcion i ON i.IDALUMNO = a.IDALUMNO AND i.IDMATRICULA = m.ID
+                LEFT JOIN tbl_grados g ON i.IDGRADO = g.IdGrados
+                LEFT JOIN tbl_nivel n ON i.IDNIVEL = n.IdNivel
+                GROUP BY a.IDALUMNO
+                ORDER BY a.IDALUMNO DESC";
 
         $res = mysqli_query($this->db, $sql);
         $alumnos = [];
 
-        // Optimizamos la actualización de códigos: los recolectamos y actualizamos fuera del loop principal si es posible
-        // O usamos una consulta directa para evitar múltiples prepared statements
-
         while ($row = mysqli_fetch_assoc($res)) {
             $id = $row['IDALUMNO'];
-
-            // Generar Código de Carnet si no tiene
             $codigo = $row['CODIGO'];
+
+            // Si no tiene código, lo generamos al vuelo pero NO actualizamos la DB aquí para optimizar rendimiento
             if (empty($codigo)) {
                 $anio = $row['ANIO_MATRICULA'] ?? date('Y');
                 $codigo = "COLE-{$anio}-{$id}";
-                // Actualización directa (aunque no ideal en un GET, es un requerimiento de persistencia del usuario)
-                mysqli_query($this->db, "UPDATE tbl_alumnos SET CODIGO = '$codigo' WHERE IDALUMNO = $id");
             }
 
             // Determinar estado
@@ -74,7 +80,7 @@ class AlumnoService {
             }
 
             $alumnos[] = [
-                "id" => $id,
+                "id" => (int)$id,
                 "carnet" => $codigo,
                 "nombre" => mb_convert_case(mb_strtolower($row['NOMBREAPELLIDO']), MB_CASE_TITLE, "UTF-8"),
                 "padre" => mb_convert_case(mb_strtolower($row['NOMBREPADRE']), MB_CASE_TITLE, "UTF-8"),
@@ -83,7 +89,12 @@ class AlumnoService {
                     "telefono" => $row['TELEFONO'],
                     "email" => $row['EMAIL']
                 ],
-                "anio_lectivo" => $row['ANIO_MATRICULA'] ?? $row['ANIO_INSCRIPCION'] ?? 'N/A',
+                "academico" => [
+                    "anio_lectivo" => $row['ANIO_MATRICULA'] ?? $row['ANIO_INSCRIPCION'] ?? 'N/A',
+                    "nivel" => $row['NOMBRE_NIVEL'] ?? 'N/A',
+                    "grado" => $row['NOMBRE_GRADO'] ?? 'N/A',
+                    "seccion" => $row['SECCION'] ?? 'N/A'
+                ],
                 "estado" => $estado
             ];
         }
@@ -150,6 +161,70 @@ class PaymentService {
         mysqli_stmt_execute($stmt);
         $res = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
         return $res['total'] ?? 0;
+    }
+}
+
+/**
+ * ColegioService Class
+ */
+class ColegioService {
+    private $db;
+
+    public function __construct($db_link) {
+        $this->db = $db_link;
+    }
+
+    public function getInfoColegio() {
+        $sql = "SELECT * FROM tbl_parametros LIMIT 1";
+        $res = mysqli_query($this->db, $sql);
+        return mysqli_fetch_assoc($res);
+    }
+}
+
+/**
+ * NivelGradoService Class
+ */
+class NivelGradoService {
+    private $db;
+
+    public function __construct($db_link) {
+        $this->db = $db_link;
+    }
+
+    public function getListaNivelesGrados() {
+        // Obtener todos los niveles
+        $sqlNiveles = "SELECT IdNivel, Nivel, Mensualidad FROM tbl_nivel ORDER BY IdNivel ASC";
+        $resNiveles = mysqli_query($this->db, $sqlNiveles);
+
+        $niveles = [];
+        while ($nivel = mysqli_fetch_assoc($resNiveles)) {
+            $idNivel = $nivel['IdNivel'];
+
+            // Obtener grados para este nivel
+            $sqlGrados = "SELECT IdGrados, Grado, total_cupo FROM tbl_grados WHERE IdNivel = ? ORDER BY IdGrados ASC";
+            $stmtGrados = mysqli_prepare($this->db, $sqlGrados);
+            mysqli_stmt_bind_param($stmtGrados, "i", $idNivel);
+            mysqli_stmt_execute($stmtGrados);
+            $resGrados = mysqli_stmt_get_result($stmtGrados);
+
+            $grados = [];
+            while ($grado = mysqli_fetch_assoc($resGrados)) {
+                $grados[] = [
+                    "id" => (int)$grado['IdGrados'],
+                    "nombre" => $grado['Grado'],
+                    "cupo" => (int)$grado['total_cupo']
+                ];
+            }
+
+            $niveles[] = [
+                "id" => (int)$idNivel,
+                "nombre" => $nivel['Nivel'],
+                "mensualidad_base" => (float)$nivel['Mensualidad'],
+                "grados" => $grados
+            ];
+        }
+
+        return $niveles;
     }
 }
 ?>
