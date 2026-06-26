@@ -166,19 +166,11 @@ def main():
         for table in all_tables:
             out.write(f"-- Table structure for table `{table}`\n")
             out.write(f"DROP TABLE IF EXISTS `{table}`;\n")
-
             t_def = target_table_defs[table]
-
-            # Eliminar IF NOT EXISTS
+            # Replace IF NOT EXISTS if it was captured
             t_def = t_def.replace("IF NOT EXISTS ", "")
-
-            # Corregir captura incompleta que termina en ENGINE
-            t_def = re.sub(r'\)\s*ENGINE\s*$', ')', t_def.strip())
-
-            # Agregar engine válido
-            if "ENGINE=" not in t_def.upper():
+            if "ENGINE=" not in t_def:
                 t_def += " ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
-
             out.write(t_def + ";\n\n")
 
         for table in all_tables:
@@ -238,8 +230,7 @@ def main():
                 opt_content = f.read()
                 alters = re.findall(r'ALTER TABLE.*?;', opt_content, re.DOTALL)
                 for alter in alters:
-                    # if "ADD INDEX" in alter or "ADD CONSTRAINT" in alter:
-                    if "ADD INDEX" in alter:
+                    if "ADD INDEX" in alter or "ADD CONSTRAINT" in alter:
                         out.write(alter + "\n")
 
         print("Adding PKs and AutoIncrements...")

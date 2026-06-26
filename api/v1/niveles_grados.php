@@ -8,7 +8,7 @@ include_once '../../includes/config.php';
 include_once '../../includes/Services.php';
 include_once '../../includes/JWT.php';
 
-// Obtener el Header de Autorización de forma robusta
+// Obtener el Header de Autorización
 $authHeader = '';
 if (function_exists('apache_request_headers')) {
     $headers = apache_request_headers();
@@ -19,7 +19,6 @@ if (function_exists('apache_request_headers')) {
         }
     }
 }
-
 if (empty($authHeader)) {
     if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
         $authHeader = $_SERVER['HTTP_AUTHORIZATION'];
@@ -29,10 +28,9 @@ if (empty($authHeader)) {
 }
 
 $token = preg_replace('/^Bearer\s+/i', '', $authHeader);
-
 $userData = JWT::validate($token);
 
-// Verificar si el token existe y está activo en la base de datos
+// Verificar token en DB
 $stmtToken = mysqli_prepare($link, "SELECT id FROM tbl_api_tokens WHERE token = ? AND activo = 1");
 mysqli_stmt_bind_param($stmtToken, "s", $token);
 mysqli_stmt_execute($stmtToken);
@@ -40,7 +38,7 @@ $resToken = mysqli_stmt_get_result($stmtToken);
 
 if (!$userData || mysqli_num_rows($resToken) === 0) {
     http_response_code(401);
-    echo json_encode(["status" => "error", "message" => "Acceso no autorizado o token inválido"]);
+    echo json_encode(["status" => "error", "message" => "Acceso no autorizado"]);
     exit;
 }
 
@@ -49,24 +47,23 @@ $cacheDir = '../../includes/cache';
 if (!is_dir($cacheDir)) {
     mkdir($cacheDir, 0777, true);
 }
-$cacheFile = $cacheDir . '/alumnos.json';
-$cacheTime = 300; // 5 minutos para alumnos (más dinámico)
+$cacheFile = $cacheDir . '/niveles_grados.json';
+$cacheTime = 3600; // 1 hora
 
 if (file_exists($cacheFile) && (time() - filemtime($cacheFile) < $cacheTime)) {
     echo file_get_contents($cacheFile);
     exit;
 }
 
-// Procesar Consulta
-$alumnoService = new AlumnoService($link);
+$nivelGradoService = new NivelGradoService($link);
 
 try {
-    $alumnos = $alumnoService->getListaCompletaAlumnos();
+    $niveles = $nivelGradoService->getListaNivelesGrados();
 
     $response = [
         "status" => "success",
-        "count" => count($alumnos),
-        "data" => $alumnos
+        "count" => count($niveles),
+        "data" => $niveles
     ];
 
     $jsonResponse = json_encode($response, JSON_UNESCAPED_UNICODE);
