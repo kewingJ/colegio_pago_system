@@ -44,37 +44,17 @@ if (!$userData || mysqli_num_rows($resToken) === 0) {
     exit;
 }
 
-// Caching logic
-$cacheDir = '../../includes/cache';
-if (!is_dir($cacheDir)) {
-    mkdir($cacheDir, 0777, true);
-}
-$cacheFile = $cacheDir . '/alumnos.json';
-$cacheTime = 300; // 5 minutos para alumnos (más dinámico)
-
-if (file_exists($cacheFile) && (time() - filemtime($cacheFile) < $cacheTime)) {
-    echo file_get_contents($cacheFile);
-    exit;
-}
-
 // Procesar Consulta
 $alumnoService = new AlumnoService($link);
 
 try {
     $alumnos = $alumnoService->getListaCompletaAlumnos();
 
-    $response = [
+    echo json_encode([
         "status" => "success",
         "count" => count($alumnos),
         "data" => $alumnos
-    ];
-
-    $jsonResponse = json_encode($response, JSON_UNESCAPED_UNICODE);
-
-    // Guardar en cache
-    file_put_contents($cacheFile, $jsonResponse);
-
-    echo $jsonResponse;
+    ], JSON_UNESCAPED_UNICODE);
 
 } catch (Exception $e) {
     http_response_code(500);
